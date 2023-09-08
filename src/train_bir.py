@@ -2,7 +2,7 @@
 import os
 import numpy as np
 import torch
-from model_bir import BirNetwork
+from model_bir import BirNetwork, BirNetworkDense
 from Data import BirefringenceDataset
 import torch.nn as nn
 # import torch.nn.functional as F
