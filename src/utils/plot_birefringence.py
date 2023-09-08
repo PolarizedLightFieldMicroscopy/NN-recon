@@ -261,15 +261,16 @@ if __name__ == "__main__":
     # gt_fig_spheres = plot_lines(delta_n_gt, optic_axis_gt,
     #                             fig=gt_fig, draw_spheres=False)
     # gt_fig_spheres.show()
-    # x=5
-    pred_filename = f"inference/round1/pred.tiff"
-    fig = plot_obj_from_file(pred_filename)
-    fig.show()
 
-    pred_filename = f"inference/relu/pred.tiff"
-    lf_filename = f"inference/relu/source.tiff"
-    fig = plot_obj_from_file(pred_filename)
-    fig.show()
+    ## plotting predictions of the model
+    # pred_filename = f"inference/round1/pred.tiff"
+    # fig = plot_obj_from_file(pred_filename)
+    # fig.show()
+
+    # pred_filename = f"inference/relu/pred.tiff"
+    # lf_filename = f"inference/relu/source.tiff"
+    # fig = plot_obj_from_file(pred_filename)
+    # fig.show()
     
     # obj_pred = imread(pred_filename)
     # delta_n_pred = obj_pred[0, ...]
@@ -279,3 +280,7 @@ if __name__ == "__main__":
     # obj_gt = imread(gt_filename)
     # delta_n_gt = obj_gt[0, ...]
     # optic_axis_gt = obj_gt[1:, ...]
+    
+    ob_filename = f"/mnt/efs/shared_data/restorators/spheres_cropped_cube/objects/0000_sphere.tiff"
+    fig = plot_obj_from_file(ob_filename)
+    fig.show()
