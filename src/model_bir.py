@@ -66,7 +66,7 @@ class BirNet(nn.Module):
     '''Network that outputs a volume of size 4x8x11x11.
     target_conv (bool): performs 3D convolutions after the dense layer
     '''
-    def __init__(self, target_conv=True):
+    def __init__(self, target_conv=False):
         super().__init__()
         self.flatten = nn.Flatten()
         self.target_conv = target_conv
@@ -82,8 +82,9 @@ class BirNet(nn.Module):
         linear_target_size = tgt_expand_size
         self.fully_connected = nn.Sequential(
             nn.Linear(linear_input_size, linear_target_size),
-            nn.ReLU(),
+            # nn.ReLU(),
         )
+        self.activation = nn.ReLU()
         # convolutions layers within target domain
         self.conv2a = nn.Sequential(
             nn.Conv3d(4, 4, kernel_size=3, padding='valid'),
@@ -102,7 +103,7 @@ class BirNet(nn.Module):
         ex3D = self.expand3D
         step3 = step2.view(batch_size, 4, 8+ex3D, 11+ex3D, 11+ex3D)
         if self.target_conv:
-            step3 = self.conv2a(step3)
+            step3 = self.conv2a(self.activation(step3))
             step4 = self.conv2b(step3)
             # add a skip connection
             step3_crop = step3[:, :, 1:-1, 1:-1, 1:-1]
@@ -288,7 +289,7 @@ if __name__ == "__main__":
     # print(model)
     # print(summary(model, (512, 16, 16)))
 
-    model = BirNet(target_conv=True).to(device)
+    model = BirNet(target_conv=False).to(device)
     print(model)
     print(summary(model, (512, 16, 16)))
 
