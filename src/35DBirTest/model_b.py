@@ -257,18 +257,18 @@ class B13NetV1(B13Net):
 
         self.flatten = nn.Flatten()
 
-        linear_input_size = 4194304 
+        linear_input_size = 5373952 
         self.fully_connected = nn.Sequential(
             nn.Linear(linear_input_size, 128),
-            nn.ReLU(),
+            nn.LeakyReLU(),
             nn.Linear(128, 64),
-            nn.ReLU(),
+            nn.LeakyReLU(),
             nn.Linear(64, 32),
-            nn.ReLU(),
+            nn.LeakyReLU(),
             nn.Linear(32, 16),
-            nn.ReLU(),
+            nn.LeakyReLU(),
             nn.Linear(16, 8),
-            nn.ReLU(),
+            nn.LeakyReLU(),
             nn.Linear(8, output_size),
         )
 
@@ -290,6 +290,12 @@ class B13NetV1(B13Net):
         step3CA = self.flatten(torch.stack(step2CA, dim=-4))
         for idx, data in enumerate(step2CA):
             step3CA = torch.cat((step3CA, self.flatten(data)), dim=-1)
+            
+        for idx, data in enumerate(setp1CA):
+            step3CA = torch.cat((step3CA, self.flatten(data)), dim=-1)
+            
+        step3CA = torch.cat((step3CA, self.flatten(input)), dim=-1)
+
         step4CA = self.fully_connected(step3CA)
 
         return step4CA
