@@ -2,7 +2,7 @@
 import os
 import numpy as np
 import torch
-from model_bir import BirNetwork, BirNetworkDense
+from model_bir import BirNetwork, BirNetworkDense, BirNet
 from Data import BirefringenceDataset
 import torch.nn as nn
 # import torch.nn.functional as F
@@ -11,7 +11,7 @@ from torch.utils.tensorboard import SummaryWriter
 import torch.optim as optim
 
 # load data
-DATA_PATH = "/mnt/efs/shared_data/restorators/spheres"
+DATA_PATH = "/mnt/efs/shared_data/restorators/spheres_11by11"
 train_data = BirefringenceDataset(DATA_PATH, split='train', source_norm=True, target_norm=True)
 val_data = BirefringenceDataset(DATA_PATH, split='val', source_norm=True, target_norm=True)
 test_data = BirefringenceDataset(DATA_PATH, split='test', source_norm=True, target_norm=True)
@@ -30,13 +30,6 @@ device = (
     else "cpu"
 )
 print(f"using {device} device")
-
-# establish the model
-net = BirNetwork().to(device)
-print(summary(net, (512, 16, 16)))
-print("model instantiated")
-criterion = nn.MSELoss()
-optimizer = optim.Adam(net.parameters(), lr=0.001)
 
 def train_one_epoch(network, trainloader, loss_function, optimizer, tfwriter, epoch):
     '''This function updates the weights of the network as it loops
@@ -67,7 +60,7 @@ def train_one_epoch(network, trainloader, loss_function, optimizer, tfwriter, ep
             running_loss = 0.0
             
         data_idx = i
-    avg_sum_per_epoch = running_loss_per_epoch/data_idx
+    avg_sum_per_epoch = running_loss_per_epoch / data_idx
     return network, avg_sum_per_epoch
 
 def validate(network, valloader, loss_function, optimizer, tfwriter, epoch):
@@ -97,12 +90,19 @@ def validate(network, valloader, loss_function, optimizer, tfwriter, epoch):
     return val_loss_per_batch
 
 if __name__ == '__main__':
+    # establish the model
+    net = BirNet().to(device)
+    print(summary(net, (512, 16, 16)))
+    print("model instantiated")
+    criterion = nn.MSELoss()
+    optimizer = optim.Adam(net.parameters(), lr=0.001)
+
     # Change the run name below before each training!
     run_name = 'training_run'
     writer = SummaryWriter('runs/' + run_name)
     # to view training results: tensorboard --logdir runs
     min_val_loss = 1000
-    for epoch in range(80):  # loop over the dataset multiple times
+    for epoch in range(100):  # loop over the dataset multiple times
         print(f"starting training epoch {epoch}")
         trained_net, train_loss_per_batch = train_one_epoch(net, trainloader, criterion, optimizer, writer, epoch)
         writer.add_scalar('Loss/train per epoch', train_loss_per_batch, epoch)

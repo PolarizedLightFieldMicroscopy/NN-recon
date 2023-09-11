@@ -77,7 +77,7 @@ class BirNet(nn.Module):
             self.expand3D = 6 # calc from conv3D kernel sizes
         else:
             self.expand3D = 0
-        tgt_sh_expanded = (4, 8+self.expand3D, 11+self.expand3D, 11+self.expand3D)
+        tgt_sh_expanded = (1, 8+self.expand3D, 11+self.expand3D, 11+self.expand3D)
         tgt_expand_size = np.prod(tgt_sh_expanded)
         linear_target_size = tgt_expand_size
         self.fully_connected = nn.Sequential(
@@ -87,7 +87,7 @@ class BirNet(nn.Module):
         self.activation = nn.ReLU()
         # convolutions layers within target domain
         self.conv2a = nn.Sequential(
-            nn.Conv3d(4, 4, kernel_size=3, padding='valid'),
+            nn.Conv3d(1, 4, kernel_size=3, padding='valid'),
             nn.ReLU(),
         )
         self.conv2b = nn.Sequential(
@@ -101,7 +101,7 @@ class BirNet(nn.Module):
         step1 = self.flatten(x)
         step2 = self.fully_connected(step1)
         ex3D = self.expand3D
-        step3 = step2.view(batch_size, 4, 8+ex3D, 11+ex3D, 11+ex3D)
+        step3 = step2.view(batch_size, 1, 8+ex3D, 11+ex3D, 11+ex3D)
         if self.target_conv:
             step3 = self.conv2a(self.activation(step3))
             step4 = self.conv2b(step3)

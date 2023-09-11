@@ -1,3 +1,4 @@
+'''Resaves the TIF files of the light field images or birefringent objects.'''
 import tifffile
 import os
 import numpy as np
