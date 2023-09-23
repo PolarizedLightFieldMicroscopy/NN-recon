@@ -1,7 +1,7 @@
 import numpy as np
 # import plotly
 import plotly.graph_objects as go
-from tifffile import imread, imwrite
+from tifffile import imread
 import matplotlib.pyplot as plt
 import stackview
 

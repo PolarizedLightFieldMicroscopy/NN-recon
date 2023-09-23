@@ -8,7 +8,6 @@ import numpy as np
 from PIL import Image
 import torch
 from torch.utils.data import Dataset, DataLoader
-from Models import UNet
 from torchvision import transforms
 from torch.utils.tensorboard import SummaryWriter
 from skimage.metrics import peak_signal_noise_ratio as psnr
