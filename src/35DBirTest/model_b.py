@@ -44,44 +44,51 @@ class B13Net(nn.Module):
             nn.ReLU(),
         )
 
-    def _resnet_block(self, in_channels, out_channels):
-        assert in_channels is not None, "Input is None"
-        assert out_channels is not None, "Output is None"
-        return nn.Sequential(
-            nn.Conv2d(in_channels, out_channels, kernel_size=3, padding=1),
-            nn.ReLU(),
-            nn.Conv2d(out_channels, out_channels, kernel_size=3, padding=1),
-            nn.ReLU(),
-        )
+    def complex_input(self, input, mode=None):
+        assert input is not None, "Input is None"
+        assert mode is not None, "Mode is None"
+        
+        real_part = input[:, 0] * torch.cos(input[:, 1])
+        imag_part = input[:, 0] * torch.sin(input[:, 1])
+        
+        if mode == "OrignalComplexStack":
+            return torch.cat((input, torch.stack((real_part, imag_part), dim=1)), dim=-5)
+        elif mode == "ComplexComponents":
+            return torch.stack((real_part, imag_part), dim=1)
+        elif mode == "ComplexNumbers":
+            return torch.view_as_complex(torch.stack((real_part, imag_part), dim=1))
+        else:
+            raise ValueError("Mode is not supported")
+
 
     # Swap the dimension of the input
     def swap_input(self, input, mode=None):
         assert input is not None, "Input is None"
-        inputs = []
+        output = []
         if mode is None:  # return the exact input, (C, 0, 1, 2, 3) is the orignal order
-            inputs.append(input)  # (C, 0, 1, 2, 3)
+            output.append(input)  # (C, 0, 1, 2, 3)
         elif mode == "swapD1D2":  # return 4 inputs with swaped XY_1 and XY_2
-            inputs.append(input)  # (C, 0, 1, 2, 3)
-            inputs.append(
+            output.append(input)  # (C, 0, 1, 2, 3)
+            output.append(
                 torch.permute(input, (0, -5, -3, -4, -2, -1))
             )  # (C, 1, 0, 2, 3)
-            inputs.append(
+            output.append(
                 torch.permute(input, (0, -5, -2, -1, -3, -4))
             )  # (C, 2, 3, 0, 1)
-            inputs.append(
+            output.append(
                 torch.permute(input, (0, -5, -1, -2, -3, -4))
             )  # (C, 3, 2, 0, 1)
         elif mode == "swapX1":  # return 4 inputs with each dimension swapped to X_1
-            inputs.append(input)  # (C, 0, 1, 2, 3)
-            inputs.append(input.swapaxes(-3, -4))  # (C, 1, 0, 2, 3)
-            inputs.append(input.swapaxes(-2, -4))  # (C, 2, 1, 0, 3)
-            inputs.append(input.swapaxes(-1, -4))  # (C, 3, 1, 2, 0)
+            output.append(input)  # (C, 0, 1, 2, 3)
+            output.append(input.swapaxes(-3, -4))  # (C, 1, 0, 2, 3)
+            output.append(input.swapaxes(-2, -4))  # (C, 2, 1, 0, 3)
+            output.append(input.swapaxes(-1, -4))  # (C, 3, 1, 2, 0)
         elif mode == "flatten2D":  # return 2 inputs with 2 dimensions flattened to 2D
-            inputs.append(input.swapaxes(-3, -5))  # (1, 0, C, 2, 3)
-            inputs.append(torch.permute(input, (0, 4, 5, 1, 2, 3)))  # (3, 2, C, 0, 1)
+            output.append(input.swapaxes(-3, -5))  # (1, 0, C, 2, 3)
+            output.append(torch.permute(input, (0, 4, 5, 1, 2, 3)))  # (3, 2, C, 0, 1)
         else:
             raise ValueError("Mode is not supported")
-        return inputs
+        return output
 
     # Apply (1, k, k) convolutions,
     def _conv3d_square(self, in_channels, kernel_size=3, scale=2, padding=1):
@@ -307,24 +314,35 @@ class B13NetV1(B13Net):
 
 
 class B13NetV2(B13Net):
-    # Apply (2, k, k) convolutions, 2 should be the channel dimension, reduce the channel dimension
-    def _conv3d_square2C(self, in_channels, kernel_size=3, scale=2):
+    # Apply (f, k, k) convolutions, f should be the channel dimension
+    def _conv3d_square2C(
+        self, in_channels=None, feature_channels=4, kernel_size=3, scale=2
+    ):
         if in_channels is None:
-            in_channels = self.input_Shape
+            in_channels = self.input_Shape**2
+        padding = (0, kernel_size // 2, kernel_size // 2)
         return nn.Sequential(
             nn.Conv3d(
                 in_channels,
                 in_channels * scale,
-                kernel_size=(2, kernel_size, kernel_size),
-                padding= (0, 1, 1),
+                kernel_size=(1, kernel_size, kernel_size),
+                padding=padding,
+            ),
+            nn.ReLU(),
+            nn.Conv3d(
+                in_channels * scale,
+                in_channels * scale,
+                kernel_size=(feature_channels, kernel_size, kernel_size),
+                padding=padding,
             ),
             nn.ReLU(),
         )
         # output shape (batch, X_1=channels, conv_Y_1, conv_X_2, conv_Y_2)
 
     def _resnet_block(
-        self, in_channels, out_channels, kernel_size=3, padding=1, increase_dim=False
+        self, in_channels, out_channels, kernel_size=3, increase_dim=False
     ):
+        padding = kernel_size // 2
         return nn.Sequential(
             nn.Conv2d(
                 in_channels,
@@ -333,64 +351,71 @@ class B13NetV2(B13Net):
                 padding=padding,
                 stride=2 if increase_dim else 1,
             ),
+            nn.BatchNorm2d(out_channels),
             nn.ReLU(),
             nn.Conv2d(
                 out_channels, out_channels, kernel_size=kernel_size, padding=padding
             ),
+            nn.BatchNorm2d(out_channels),
             nn.ReLU(),
         )
 
     def __init__(
         self,
-        output_size=1,  # number of output channels, either 1, 3, or 4
-        input_shape=16,  # size of input dimension, 16 for default
-        feat=16,  # number of features in the first layer
-        scale=2,  # scale factor for the number of features
-        kernel_size=3,  # size of the kernel
-        padding=1,  # padding of the kernel
-        depth=16,  # depth of the network
+        output_size=1,
+        input_shape=16,
+        feat=16,
+        scale=2,
+        kernel_size=3,
+        padding=1,
+        depth=16,
+        block_size = 4,
         fcldepth=2,  # depth of the fully connected layer
+        complex_mode=None,
     ):
-        super().__init__(
-            output_size,
-            input_shape,
-            feat,
-            scale,
-            kernel_size,
-            padding,
-            depth,
-            fcldepth,
-        )
+        super().__init__()
         assert kernel_size % 2 == 1, "Kernel size must be odd"
         assert depth < 20, "Max supported depth is 20"
-        assert depth >= 4, "Min supported depth is 0"
+        assert depth >= 4, "Min supported depth is 4"
+        assert block_size < 5, "Max supported block size is 4"
         assert fcldepth < 3, "Max supported depth is 2"
 
         self.output_size = output_size
         self.input_shape = input_shape
-        self.depth = depth
         self.feat = feat
         self.scale = scale
         self.kernel_size = kernel_size
         self.padding = padding
+        self.depth = depth
+        self.block_size = block_size
         self.fcldepth = fcldepth
+        self.complex_mode = complex_mode
+        
+        if complex_mode is None or complex_mode == "ComplexComponents" or complex_mode == "ComplexNumbers":
+            self.feature_channels = 2 
+        elif complex_mode == "OrignalComplexStack":
+            self.feature_channels = 4
+        else:
+            raise ValueError("Mode is not supported")
 
-        self.flatten2D = nn.Flatten(
-            -5, -4
-        )  # flatten the first 2 dimensions into channels
+        self.flatten2D = nn.Flatten(-5, -4)
+        self.flatten1D = nn.Flatten(-1)
+
 
         self.initialConv3D = self._conv3d_square2C(  # reduce the channel dimension to 1
-            in_channels=input_shape * input_shape,
-            kernel_size=3,
+            in_channels=input_shape**2,
+            feature_channels=self.feature_channels,
+            kernel_size=kernel_size,
             scale=scale,
         )
 
         in_channels = input_shape * input_shape * scale
+        num_groups = depth // block_size  # 4 blocks per group
+
         self.resnet_layers = nn.ModuleList()
-        num_groups = depth // 4  # 4 blocks per group
         for i in range(num_groups):
             # 4 blocks with the same number of channels
-            for _ in range(4):
+            for _ in range(block_size):
                 self.resnet_layers.append(self._resnet_block(in_channels, in_channels))
             # 1 block that shrinks dimensions and doubles channels
             out_channels = in_channels * 2
@@ -398,21 +423,35 @@ class B13NetV2(B13Net):
                 self._resnet_block(in_channels, out_channels, increase_dim=True)
             )
             in_channels = out_channels
+            
+        self.linear = nn.Sequential(
+            nn.Linear(out_channels*2, 1024),
+            nn.LeakyReLU(),
+            nn.Linear(1024, 256),
+            nn.LeakyReLU(),
+            nn.Linear(256, 64),
+            nn.LeakyReLU(),
+            nn.Linear(64, 16),
+            nn.LeakyReLU(),
+            nn.Linear(16, output_size),
+        )
+
 
     def forward(self, input):
-        inputsA = self.swap_input(input, mode="flatten2D")
+        if self.complex_mode is not None:
+            inputsA = self.complex_input(input, mode=self.complex_mode)
+        inputsA = self.swap_input(inputsA, mode="flatten2D")
 
-        step1flatten = []
-        for idx, data in enumerate(inputsA):
-            step1flatten.append(self.flatten2D(data))
-
-        print(step1flatten[0].shape)
+        step1Flatten = []
+        for data in inputsA:
+            step1Flatten.append(self.flatten2D(data))
 
         step2Conv3D = []
-        for idx, data in enumerate(step1flatten):
+        for data in step1Flatten:
             step2Conv3D.append(self.initialConv3D(data).squeeze(dim=-3))
 
-        for idx, data in enumerate(step2Conv3D):
+        step3Resnet = []
+        for data in step2Conv3D:
             for layer in self.resnet_layers:
                 residual = data
                 data = layer(data)
@@ -420,5 +459,8 @@ class B13NetV2(B13Net):
                     data.shape == residual.shape
                 ):  # Add residual only if the shapes match
                     data += residual
+            step3Resnet.append(data.squeeze())
+        
+        step4Linear = self.linear(torch.cat((step3Resnet[0], step3Resnet[1]), 1))
 
-        return step2Conv3D[0]
+        return step4Linear
