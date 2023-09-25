@@ -425,7 +425,9 @@ class B13NetV2(B13Net):
             in_channels = out_channels
             
         self.linear = nn.Sequential(
-            nn.Linear(out_channels*2, 1024),
+            nn.Linear(out_channels*2, 4096),
+            nn.LeakyReLU(),
+            nn.Linear(4096, 1024),
             nn.LeakyReLU(),
             nn.Linear(1024, 256),
             nn.LeakyReLU(),
