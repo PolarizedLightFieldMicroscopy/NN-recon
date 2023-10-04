@@ -65,6 +65,8 @@ class BirNetworkDense(nn.Module):
 class BirNet(nn.Module):
     '''Network that outputs a volume of size 4x8x11x11.
     target_conv (bool): performs 3D convolutions after the dense layer
+
+    Note that without target_conv, the output is has only one channel.
     '''
     def __init__(self, target_conv=False):
         super().__init__()
@@ -274,27 +276,30 @@ class BirNetwork1(nn.Module):
         output = step5
         # output = step3
         return output
-    
+
 if __name__ == "__main__":
-    device = (
+    DEVICE = (
         "cuda"
         if torch.cuda.is_available()
         else "mps"
         if torch.backends.mps.is_available()
         else "cpu"
     )
-    print(f"Using {device} device")
+    print(f"Using {DEVICE} device")
 
     # model = BirNetwork().to(device)
     # print(model)
     # print(summary(model, (512, 16, 16)))
 
-    model = BirNet(target_conv=False).to(device)
+    model = BirNet(target_conv=True).to(DEVICE)
     print(model)
     print(summary(model, (512, 16, 16)))
 
-    TRAIN_DATA_PATH = "/mnt/efs/shared_data/restorators/spheres_11by11"
-    train_data = BirefringenceDataset(TRAIN_DATA_PATH, split='test', source_norm=True, target_norm=True)
-    X = train_data[0][0].to(device).to(torch.float32).unsqueeze(dim=0)
-    y_pred = model(X)
-    print(f"Predicted values: {y_pred}")
+    APPLY_MODEL = False
+    if APPLY_MODEL:
+        TRAIN_DATA_PATH = "../../../NN_data/small_sphere_random_bir1000/spheres_11by11"
+        train_data = BirefringenceDataset(TRAIN_DATA_PATH, split='test',
+                                          source_norm=True, target_norm=True)
+        X = train_data[0][0].to(DEVICE).to(torch.float32).unsqueeze(dim=0)
+        y_pred = model(X)
+        print(f"Predicted values: {y_pred}")

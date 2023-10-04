@@ -1,16 +1,45 @@
-import torch  # PyTorch machine learning library
+'''Architectures that receive the input polarized light field images as 4D.
+This script includes the following three classes:
+B13Net: abstract base class
+B13NetV1: 3D convolutions + dense layers
+B13NetV2: 2D/3D convolutions + resnet + dense layers
+'''
+import torch
 import torch.nn as nn
-from torchsummary import summary
-
+from torchinfo import summary
+from data_b import BirDataB
 
 class B13Net(nn.Module):
-    """BirImg2C1
+    """
+    Abstract class providing utility functions for convolutions and
+    managing the input data.
+
     A torch model class for the birefringence problem
     Assume the dimension of the input is:
     (D0 = channel, D1 = X_1, D2 =Y_1, D3 = X2, D4 = Y2)
     XY_1 are index of the microlens
     XY_2 are index of the pixel of each microlens
     """
+    def __init__(
+        self,
+        output_size=1,  # number of output channels, either 1, 3, or 4
+        input_shape=16,  # size of input dimension, 16 for default
+        feat=16,  # number of features in the first layer
+        scale=2,  # scale factor for the number of features
+        kernel_size=3,  # size of the kernel
+        padding=1,  # padding of the kernel
+        depth=2,  # depth of the network
+        fcldepth=2,  # depth of the fully connected layer
+    ):
+        super().__init__()
+        self.output_size = output_size
+        self.input_shape = input_shape
+        self.depth = depth
+        self.feat = feat
+        self.scale = scale
+        self.kernel_size = kernel_size
+        self.padding = padding
+        self.fcldepth = fcldepth
 
     # General 3d convolutional block
     def _conv3d_block(self, in_channels, out_channels, kernel_size=3, padding=0):
@@ -44,15 +73,15 @@ class B13Net(nn.Module):
             nn.ReLU(),
         )
 
-    def complex_input(self, input, mode=None):
-        assert input is not None, "Input is None"
+    def complex_input(self, input_data, mode=None):
+        assert input_data is not None, "Input is None"
         assert mode is not None, "Mode is None"
         
-        real_part = input[:, 0] * torch.cos(input[:, 1])
-        imag_part = input[:, 0] * torch.sin(input[:, 1])
+        real_part = input_data[:, 0] * torch.cos(input_data[:, 1])
+        imag_part = input_data[:, 0] * torch.sin(input_data[:, 1])
         
         if mode == "OrignalComplexStack":
-            return torch.cat((input, torch.stack((real_part, imag_part), dim=1)), dim=-5)
+            return torch.cat((input_data, torch.stack((real_part, imag_part), dim=1)), dim=-5)
         elif mode == "ComplexComponents":
             return torch.stack((real_part, imag_part), dim=1)
         elif mode == "ComplexNumbers":
@@ -60,32 +89,31 @@ class B13Net(nn.Module):
         else:
             raise ValueError("Mode is not supported")
 
-
-    # Swap the dimension of the input
-    def swap_input(self, input, mode=None):
-        assert input is not None, "Input is None"
+    # Swap the dimension of the input data
+    def swap_input(self, input_data, mode=None):
+        assert input_data is not None, "Input is None"
         output = []
         if mode is None:  # return the exact input, (C, 0, 1, 2, 3) is the orignal order
-            output.append(input)  # (C, 0, 1, 2, 3)
+            output.append(input_data)  # (C, 0, 1, 2, 3)
         elif mode == "swapD1D2":  # return 4 inputs with swaped XY_1 and XY_2
-            output.append(input)  # (C, 0, 1, 2, 3)
+            output.append(input_data)  # (C, 0, 1, 2, 3)
             output.append(
-                torch.permute(input, (0, -5, -3, -4, -2, -1))
+                torch.permute(input_data, (0, -5, -3, -4, -2, -1))
             )  # (C, 1, 0, 2, 3)
             output.append(
-                torch.permute(input, (0, -5, -2, -1, -3, -4))
+                torch.permute(input_data, (0, -5, -2, -1, -3, -4))
             )  # (C, 2, 3, 0, 1)
             output.append(
-                torch.permute(input, (0, -5, -1, -2, -3, -4))
+                torch.permute(input_data, (0, -5, -1, -2, -3, -4))
             )  # (C, 3, 2, 0, 1)
         elif mode == "swapX1":  # return 4 inputs with each dimension swapped to X_1
-            output.append(input)  # (C, 0, 1, 2, 3)
-            output.append(input.swapaxes(-3, -4))  # (C, 1, 0, 2, 3)
-            output.append(input.swapaxes(-2, -4))  # (C, 2, 1, 0, 3)
-            output.append(input.swapaxes(-1, -4))  # (C, 3, 1, 2, 0)
+            output.append(input_data)  # (C, 0, 1, 2, 3)
+            output.append(input_data.swapaxes(-3, -4))  # (C, 1, 0, 2, 3)
+            output.append(input_data.swapaxes(-2, -4))  # (C, 2, 1, 0, 3)
+            output.append(input_data.swapaxes(-1, -4))  # (C, 3, 1, 2, 0)
         elif mode == "flatten2D":  # return 2 inputs with 2 dimensions flattened to 2D
-            output.append(input.swapaxes(-3, -5))  # (1, 0, C, 2, 3)
-            output.append(torch.permute(input, (0, 4, 5, 1, 2, 3)))  # (3, 2, C, 0, 1)
+            output.append(input_data.swapaxes(-3, -5))  # (1, 0, C, 2, 3)
+            output.append(torch.permute(input_data, (0, 4, 5, 1, 2, 3)))  # (3, 2, C, 0, 1)
         else:
             raise ValueError("Mode is not supported")
         return output
@@ -93,7 +121,7 @@ class B13Net(nn.Module):
     # Apply (1, k, k) convolutions,
     def _conv3d_square(self, in_channels, kernel_size=3, scale=2, padding=1):
         if in_channels is None:
-            in_channels = self.input_Shape
+            in_channels = self.input_shape
         return self._conv3d_block(
             in_channels,
             in_channels * scale,
@@ -106,7 +134,7 @@ class B13Net(nn.Module):
     def _conv3d_rod(self, in_channels, in_dim, kernel_size=1, scale=2, padding=1):
         assert in_dim is not None, "Input dimension is None"
         if in_channels is None:
-            in_channels = self.input_Shape
+            in_channels = self.input_shape
         return self._conv3d_block(
             in_channels,
             in_channels * scale,
@@ -120,7 +148,7 @@ class B13Net(nn.Module):
     # Apply (n, 1, 1) convolutions, n is the size of a dimension, 1 for compressing a dimension
     def _conv3d_axis(self, in_channels, in_dim, scale=2, padding=0):
         if in_channels is None:
-            in_channels = self.input_Shape
+            in_channels = self.input_shape
         return self._conv3d_block(
             in_channels,
             in_channels * scale,
@@ -131,34 +159,21 @@ class B13Net(nn.Module):
         )  # Y_1 is squeezed
         # output shape (X_1_conv_Y_1=channel, X_2, Y_2)
 
-    def __init__(
-        self,
-        output_size=1,  # number of output channels, either 1, 3, or 4
-        input_shape=16,  # size of input dimension, 16 for default
-        feat=16,  # number of features in the first layer
-        scale=2,  # scale factor for the number of features
-        kernel_size=3,  # size of the kernel
-        padding=1,  # padding of the kernel
-        depth=2,  # depth of the network
-        fcldepth=2,  # depth of the fully connected layer
-    ):
-        super().__init__()
-        self.output_size = output_size
-        self.input_shape = input_shape
-        self.depth = depth
-        self.feat = feat
-        self.scale = scale
-        self.kernel_size = kernel_size
-        self.padding = padding
-        self.fcldepth = fcldepth
+    def forward(self, *args):
+        raise NotImplementedError("Subclasses should implement this!")
 
 
 # B13NetV1 uses the (3, 3, 3) convolution
 class B13NetV1(B13Net):
+    '''
+    Performs 3D convolutions to encode the input,
+    and uses a series of dense layers to decode.
+    '''
     # Apply (k, k, k) convolutions
     def _conv3d_cube(self, in_channels, out_channels, kernel_size=3, padding=1):
+        '''3D convolution with a cube shaped kernel'''
         if in_channels is None:
-            in_channels = self.input_Shape
+            in_channels = self.input_shape
         return self._conv3d_block(
             in_channels,
             out_channels,
@@ -281,9 +296,9 @@ class B13NetV1(B13Net):
             nn.Linear(16, output_size),
         )
 
-    def forward(self, input):
+    def forward(self, input_data):
         # input shape (batch, C, X_1, Y_1, X_2, Y_2)
-        inputsA = self.swap_input(input, mode="swapD1D2")
+        inputsA = self.swap_input(input_data, mode="swapD1D2")
 
         step1C0 = (
             []
@@ -306,20 +321,34 @@ class B13NetV1(B13Net):
         for idx, data in enumerate(setp1CA):
             step3CA = torch.cat((step3CA, self.flatten(data)), dim=-1)
 
-        step3CA = torch.cat((step3CA, self.flatten(input)), dim=-1)
+        step3CA = torch.cat((step3CA, self.flatten(input_data)), dim=-1)
 
         step4CA = self.fully_connected(step3CA)
 
         return step4CA
 
 
+# Apply (f, k, k) convolutions, f should be the channel dimension
 class B13NetV2(B13Net):
-    # Apply (f, k, k) convolutions, f should be the channel dimension
+    '''
+    Stores the input data at complex numbers.
+    The architecture has the following layers:
+    1. 2D/3D convolutions
+    2. Residual layers
+    3. Dense layers
+    '''
     def _conv3d_square2C(
         self, in_channels=None, feature_channels=4, kernel_size=3, scale=2
     ):
+        '''
+        Performs two convolutions:
+        1. effectively a 2D convolution actoss the spactial dimensions
+        3. 3D convolution using the feature dimension
+        The first step captures spatial features within each channel,
+        while the second step captures inter-channel relationships.
+        '''
         if in_channels is None:
-            in_channels = self.input_Shape**2
+            in_channels = self.input_shape**2
         padding = (0, kernel_size // 2, kernel_size // 2)
         return nn.Sequential(
             nn.Conv3d(
@@ -390,17 +419,16 @@ class B13NetV2(B13Net):
         self.block_size = block_size
         self.fcldepth = fcldepth
         self.complex_mode = complex_mode
-        
+
         if complex_mode is None or complex_mode == "ComplexComponents" or complex_mode == "ComplexNumbers":
-            self.feature_channels = 2 
+            self.feature_channels = 2
         elif complex_mode == "OrignalComplexStack":
             self.feature_channels = 4
         else:
             raise ValueError("Mode is not supported")
 
-        self.flatten2D = nn.Flatten(-5, -4)
-        self.flatten1D = nn.Flatten(-1)
-
+        self.flatten2D = nn.Flatten(-5, -4) # collapses tensor to 2D
+        self.flatten1D = nn.Flatten(-1)     # collapses tensor to 1D
 
         self.initialConv3D = self._conv3d_square2C(  # reduce the channel dimension to 1
             in_channels=input_shape**2,
@@ -423,7 +451,7 @@ class B13NetV2(B13Net):
                 self._resnet_block(in_channels, out_channels, increase_dim=True)
             )
             in_channels = out_channels
-            
+
         self.linear = nn.Sequential(
             nn.Linear(out_channels*2, 4096),
             nn.LeakyReLU(),
@@ -438,10 +466,11 @@ class B13NetV2(B13Net):
             nn.Linear(16, output_size),
         )
 
-
-    def forward(self, input):
+    def forward(self, input_data):
         if self.complex_mode is not None:
-            inputsA = self.complex_input(input, mode=self.complex_mode)
+            inputsA = self.complex_input(input_data, mode=self.complex_mode)
+        else:
+            print(f"The complex mode, {self.complex_mode}, is not implemented.")
         inputsA = self.swap_input(inputsA, mode="flatten2D")
 
         step1Flatten = []
@@ -462,7 +491,40 @@ class B13NetV2(B13Net):
                 ):  # Add residual only if the shapes match
                     data += residual
             step3Resnet.append(data.squeeze())
-        
+
         step4Linear = self.linear(torch.cat((step3Resnet[0], step3Resnet[1]), 1))
 
         return step4Linear
+
+if __name__ == "__main__":
+    DEVICE = (
+        "cuda"
+        if torch.cuda.is_available()
+        else "mps"
+        if torch.backends.mps.is_available()
+        else "cpu"
+    )
+    print(f"Using {DEVICE} device")
+
+    # Pick a model architecture
+    model = B13NetV1(output_size=3, depth=2).to(DEVICE)
+    model = B13NetV2(output_size=3, depth=16, complex_mode="OrignalComplexStack").to(DEVICE)
+    print(model)
+
+    SUM_FROM_INFO = True
+    if SUM_FROM_INFO:
+        model_size1 = (2, 2, 16, 16, 16, 16)
+        model_size2 = (5, 2, 16, 16, 16, 16)
+        print(summary(model, input_size=model_size2))
+    else:
+        # torchsummary package raises dimension error on complex_input function -2023/10/04
+        # from torchsummary import summary
+        print(summary(model, (5, 2, 16, 16, 16, 16)))
+
+    APPLY_MODEL = False
+    if APPLY_MODEL:
+        TRAIN_DATA_PATH = "../../../NN_data/small_sphere_random_bir1000/spheres_11by11"
+        train_data = BirDataB(TRAIN_DATA_PATH)
+        X = train_data[0][0].to(DEVICE).to(torch.float32).unsqueeze(dim=0)
+        y_pred = model(X)
+        print(f"Predicted values: {y_pred}")

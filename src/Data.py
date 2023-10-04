@@ -12,7 +12,8 @@ import tifffile
 from tifffile import imread
 
 class RestoratorsDataset(Dataset, ABC):
-    '''A PyTorch dataset to serve as a base class for our custom transformer datasets.'''
+    '''An abstract PyTorch dataset class to serve as a base class for
+    our custom transformer datasets.'''
     def __init__(self, root_dir):
         assert self.root_dir is not None
         return None
@@ -79,7 +80,7 @@ class BirefringenceDataset(RestoratorsDataset):
     def img_transform(self, image):
         '''Transforms, normally in a simple way, the source data.'''
         return image
-    
+
     def numpy2tensor(self, array):
         return torch.from_numpy(array)
 
@@ -125,6 +126,7 @@ if __name__ == "__main__":
     # train_loader, val_loader = load()
     TRAIN_DATA_PATH = "/mnt/efs/shared_data/restorators/spheres"
 
-    train_data = BirefringenceDataset(TRAIN_DATA_PATH, split='test', source_norm=True, target_norm=True)
+    train_data = BirefringenceDataset(TRAIN_DATA_PATH, split='test',
+                                      source_norm=True, target_norm=True)
     train_data[0] # pair 0
     train_data[1] # pair 1

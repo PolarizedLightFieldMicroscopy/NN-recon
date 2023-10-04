@@ -11,7 +11,7 @@ from torch.utils.tensorboard import SummaryWriter
 import torch.optim as optim
 
 # load data
-DATA_PATH = "/mnt/efs/shared_data/restorators/spheres_11by11"
+DATA_PATH = "../../NN_data/small_sphere_random_bir1000/spheres_11by11"
 train_data = BirefringenceDataset(DATA_PATH, split='train', source_norm=True, target_norm=True)
 val_data = BirefringenceDataset(DATA_PATH, split='val', source_norm=True, target_norm=True)
 test_data = BirefringenceDataset(DATA_PATH, split='test', source_norm=True, target_norm=True)
@@ -22,14 +22,14 @@ valloader = torch.utils.data.DataLoader(val_data, batch_size=batch_size,
                                           shuffle=True, num_workers=2)
 testloader = torch.utils.data.DataLoader(test_data, batch_size=batch_size,
                                          shuffle=False, num_workers=2)
-device = (
+DEVICE = (
     "cuda"
     if torch.cuda.is_available()
     else "mps"
     if torch.backends.mps.is_available()
     else "cpu"
 )
-print(f"using {device} device")
+print(f"using {DEVICE} device")
 
 def train_one_epoch(network, trainloader, loss_function, optimizer, tfwriter, epoch):
     '''This function updates the weights of the network as it loops
@@ -39,8 +39,8 @@ def train_one_epoch(network, trainloader, loss_function, optimizer, tfwriter, ep
     for i, data in enumerate(trainloader, start=0):
         network.train()
         source, target = data
-        source = source.to(device)
-        target = target.to(device)
+        source = source.to(DEVICE)
+        target = target.to(DEVICE)
 
         # zero the parameter gradients
         optimizer.zero_grad()
@@ -58,7 +58,7 @@ def train_one_epoch(network, trainloader, loss_function, optimizer, tfwriter, ep
             tfwriter.add_scalar('Loss/train', running_loss / 50, i)
             print(f'[{epoch + 1}, {i + 1:5d}] loss: {running_loss:.3f}')
             running_loss = 0.0
-            
+
         data_idx = i
     avg_sum_per_epoch = running_loss_per_epoch / data_idx
     return network, avg_sum_per_epoch
@@ -72,8 +72,8 @@ def validate(network, valloader, loss_function, optimizer, tfwriter, epoch):
     #  iterating through batches
     for i, data in enumerate(valloader, start=0):
         source, target = data
-        source = source.to(device)
-        target = target.to(device)
+        source = source.to(DEVICE)
+        target = target.to(DEVICE)
         # zero the parameter gradients
         optimizer.zero_grad()
         output = network(source)
@@ -91,14 +91,14 @@ def validate(network, valloader, loss_function, optimizer, tfwriter, epoch):
 
 if __name__ == '__main__':
     # establish the model
-    net = BirNet().to(device)
+    net = BirNet(target_conv=True).to(DEVICE)
     print(summary(net, (512, 16, 16)))
     print("model instantiated")
     criterion = nn.MSELoss()
     optimizer = optim.Adam(net.parameters(), lr=0.001)
 
     # Change the run name below before each training!
-    run_name = 'training_run'
+    run_name = 'conv3d_after_fully_connected'
     writer = SummaryWriter('runs/' + run_name)
     # to view training results: tensorboard --logdir runs
     min_val_loss = 1000
@@ -110,11 +110,11 @@ if __name__ == '__main__':
         # validate after each epoch
         val_loss_per_batch = validate(trained_net, valloader, criterion, optimizer, writer, epoch)
         writer.add_scalar('Loss/validate per epoch', np.mean(val_loss_per_batch), epoch)
-        
+
         print(f'mean val loss: {np.mean(val_loss_per_batch):.6f}, current min val loss: {min_val_loss:.6f}')
         if np.mean(val_loss_per_batch) < min_val_loss:
             # save model
-            save_dir = "/mnt/efs/shared_data/restorators/models_bir/" + run_name + '/'
+            save_dir = "../../../NN_data/small_sphere_random_bir1000/models/BirNet_Oct3/" + run_name + '/'
             if not os.path.exists(save_dir):
                 os.makedirs(save_dir)
             model_filename = save_dir + f'epoch{epoch}.pt'
@@ -126,7 +126,7 @@ if __name__ == '__main__':
     print('finished training')
 
     # save model
-    save_dir = "/mnt/efs/shared_data/restorators/models_bir/" + run_name + '/'
+    save_dir = "../../../NN_data/small_sphere_random_bir1000/models/BirNet_Oct3/" + run_name + '/'
     if not os.path.exists(save_dir):
         os.makedirs(save_dir)
     model_filename = save_dir + 'final.pt'
