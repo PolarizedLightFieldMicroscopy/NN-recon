@@ -9,11 +9,11 @@ from torch import nn
 from torch import optim
 from torch.utils.tensorboard import SummaryWriter
 from torchsummary import summary
-from src.model_bir import BirNetwork, BirNetworkDense, BirNet
-from src.Data import BirefringenceDataset
+from model_bir import BirNetwork, BirNetworkDense, BirNet
+from Data import BirefringenceDataset
 
 DATA_PATH = "../../NN_data/small_sphere_random_bir1000/spheres_11by11"
-RUN_NAME = 'conv3d_after_fully_connected'
+RUN_NAME = 'conv3d_after_fully_connected3'
 SAVE_DIR = "../../../NN_data/small_sphere_random_bir1000/models/BirNet_Nov10/" + RUN_NAME + '/'
 DEVICE = (
     "cuda"

@@ -4,7 +4,7 @@ import numpy as np
 import torch
 from torch import nn
 from torchsummary import summary
-from src.Data import BirefringenceDataset
+from Data import BirefringenceDataset
 
 class BirNetworkDense(nn.Module):
     '''Network that mainly uses a fully connected layer.
