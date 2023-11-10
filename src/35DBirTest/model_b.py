@@ -473,6 +473,7 @@ class B13NetV2(B13Net):
             print(f"The complex mode, {self.complex_mode}, is not implemented.")
         inputsA = self.swap_input(inputsA, mode="flatten2D")
 
+        # Create two parallel tracks for the data
         step1Flatten = []
         for data in inputsA:
             step1Flatten.append(self.flatten2D(data))
@@ -481,6 +482,7 @@ class B13NetV2(B13Net):
         for data in step1Flatten:
             step2Conv3D.append(self.initialConv3D(data).squeeze(dim=-3))
 
+        # Combine the two parallel tracks into the ResNet
         step3Resnet = []
         for data in step2Conv3D:
             for layer in self.resnet_layers:
