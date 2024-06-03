@@ -1,31 +1,33 @@
-'''Script to test a trained model on the set of birefringence data'''
+"""Script to test a trained model on the set of birefringence data"""
+
 import torch
 from torchsummary import summary
 from tifffile import imread, imwrite
 import os
-from Data import BirefringenceDataset
+from data import BirefringenceDataset
 from model_bir import BirNetwork, BirNetwork1, BirNetworkDense
 
 device = (
     "cuda"
     if torch.cuda.is_available()
-    else "mps"
-    if torch.backends.mps.is_available()
-    else "cpu"
+    else "mps" if torch.backends.mps.is_available() else "cpu"
 )
 print(f"using {device} device")
 
 saved_model_dir = "/mnt/efs/shared_data/restorators/models_bir/"
 
 DATA_PATH = "/mnt/efs/shared_data/restorators/spheres"
-test_data = BirefringenceDataset(DATA_PATH, split='test', source_norm=True, target_norm=True)
-testloader = torch.utils.data.DataLoader(test_data, batch_size=1,
-                                         shuffle=False, num_workers=2)
+test_data = BirefringenceDataset(
+    DATA_PATH, split="test", source_norm=True, target_norm=True
+)
+testloader = torch.utils.data.DataLoader(
+    test_data, batch_size=1, shuffle=False, num_workers=2
+)
 
 model_relu = BirNetwork1().to(device)
 print(summary(model_relu, (512, 16, 16)))
 model_relu.eval()
-weights_relu = torch.load(saved_model_dir + 'sphere128.pt')
+weights_relu = torch.load(saved_model_dir + "sphere128.pt")
 model_relu.load_state_dict(weights_relu)
 
 # model_leaky = BirNetwork().to(device)
@@ -54,9 +56,9 @@ with torch.no_grad():
 
 save_mode = False
 if save_mode:
-    save_dir = 'inference/mymodel/'
+    save_dir = "inference/mymodel/"
     if not os.path.isdir(save_dir):
         os.makedirs(save_dir)
-    imwrite(os.path.join(save_dir, 'pred.tiff'), target_pred_relu)
+    imwrite(os.path.join(save_dir, "pred.tiff"), target_pred_relu)
     source = source.cpu().squeeze(axis=0).numpy()
-    imwrite(os.path.join(save_dir, 'source.tiff'), source)
+    imwrite(os.path.join(save_dir, "source.tiff"), source)

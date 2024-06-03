@@ -1,17 +1,14 @@
 """Create dataset classes to import the data into the appropriate format."""
-from torch.utils.data import Dataset, DataLoader
-from torchvision import transforms
+
+from torch.utils.data import Dataset
 import torch
 import os
-import matplotlib.pyplot as plt
-import numpy as np
 from tifffile import imread
 
 
 class BirDataB(Dataset):
-    """A PyTorch dataset to load polarized light field images and birefringent objects
-    
-    """
+    """A PyTorch dataset to load polarized light field images and birefringent objects"""
+
     def __init__(
         self,
         root_dir,
@@ -41,7 +38,7 @@ class BirDataB(Dataset):
         elif split == "test":
             self.source = self.source[num_train + num_val :]
             self.target = self.target[num_train + num_val :]
-            
+
     # get the total number of samples
     def __len__(self):
         return len(self.source)
@@ -56,7 +53,7 @@ class BirDataB(Dataset):
 
         if self.target_idx is not None:
             target = target[self.target_idx]
-        
+
         return source, target
 
     def source_transform(self, img):

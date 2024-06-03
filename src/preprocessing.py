@@ -1,4 +1,5 @@
-'''Preprocess the data before loading it into the dataset class'''
+"""Preprocess the data before loading it into the dataset class"""
+
 import tifffile
 import os
 from utils.data_format import transform_into_pinhole_2channels, concat_pinholes_ret_azim

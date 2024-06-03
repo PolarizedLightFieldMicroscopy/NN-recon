@@ -1,10 +1,12 @@
-'''Training script to train the model defined in model_bir.py'''
+"""Training script to train the model defined in model_bir.py"""
+
 import os
 import numpy as np
 import torch
 from model_bir import BirNetwork, BirNetworkDense, BirNet
-from Data import BirefringenceDataset
+from data import BirefringenceDataset
 import torch.nn as nn
+
 # import torch.nn.functional as F
 from torchsummary import summary
 from torch.utils.tensorboard import SummaryWriter
@@ -12,28 +14,36 @@ import torch.optim as optim
 
 # load data
 DATA_PATH = "../../NN_data/small_sphere_random_bir1000/spheres_11by11"
-train_data = BirefringenceDataset(DATA_PATH, split='train', source_norm=True, target_norm=True)
-val_data = BirefringenceDataset(DATA_PATH, split='val', source_norm=True, target_norm=True)
-test_data = BirefringenceDataset(DATA_PATH, split='test', source_norm=True, target_norm=True)
+train_data = BirefringenceDataset(
+    DATA_PATH, split="train", source_norm=True, target_norm=True
+)
+val_data = BirefringenceDataset(
+    DATA_PATH, split="val", source_norm=True, target_norm=True
+)
+test_data = BirefringenceDataset(
+    DATA_PATH, split="test", source_norm=True, target_norm=True
+)
 batch_size = 1
-trainloader = torch.utils.data.DataLoader(train_data, batch_size=batch_size,
-                                          shuffle=True, num_workers=2)
-valloader = torch.utils.data.DataLoader(val_data, batch_size=batch_size,
-                                          shuffle=True, num_workers=2)
-testloader = torch.utils.data.DataLoader(test_data, batch_size=batch_size,
-                                         shuffle=False, num_workers=2)
+trainloader = torch.utils.data.DataLoader(
+    train_data, batch_size=batch_size, shuffle=True, num_workers=2
+)
+valloader = torch.utils.data.DataLoader(
+    val_data, batch_size=batch_size, shuffle=True, num_workers=2
+)
+testloader = torch.utils.data.DataLoader(
+    test_data, batch_size=batch_size, shuffle=False, num_workers=2
+)
 DEVICE = (
     "cuda"
     if torch.cuda.is_available()
-    else "mps"
-    if torch.backends.mps.is_available()
-    else "cpu"
+    else "mps" if torch.backends.mps.is_available() else "cpu"
 )
 print(f"using {DEVICE} device")
 
+
 def train_one_epoch(network, trainloader, loss_function, optimizer, tfwriter, epoch):
-    '''This function updates the weights of the network as it loops
-    through all the data in the dataset.'''
+    """This function updates the weights of the network as it loops
+    through all the data in the dataset."""
     running_loss = 0.0
     running_loss_per_epoch = 0.0
     for i, data in enumerate(trainloader, start=0):
@@ -54,21 +64,22 @@ def train_one_epoch(network, trainloader, loss_function, optimizer, tfwriter, ep
         # print statistics
         running_loss += train_loss.item()
         running_loss_per_epoch += train_loss.item()
-        if i % 50 == 49:    # print every 50 mini-batches
-            tfwriter.add_scalar('Loss/train', running_loss / 50, i)
-            print(f'[{epoch + 1}, {i + 1:5d}] loss: {running_loss:.3f}')
+        if i % 50 == 49:  # print every 50 mini-batches
+            tfwriter.add_scalar("Loss/train", running_loss / 50, i)
+            print(f"[{epoch + 1}, {i + 1:5d}] loss: {running_loss:.3f}")
             running_loss = 0.0
 
         data_idx = i
     avg_sum_per_epoch = running_loss_per_epoch / data_idx
     return network, avg_sum_per_epoch
 
+
 def validate(network, valloader, loss_function, optimizer, tfwriter, epoch):
-    '''This function validates network parameter optimizations'''
+    """This function validates network parameter optimizations"""
     running_loss = 0.0
     val_loss_per_batch = []
     network.eval()
-    print('validating...')
+    print("validating...")
     #  iterating through batches
     for i, data in enumerate(valloader, start=0):
         source, target = data
@@ -81,15 +92,16 @@ def validate(network, valloader, loss_function, optimizer, tfwriter, epoch):
         val_loss_per_batch.append(val_loss.item())
         # print statistics
         running_loss += val_loss.item()
-        if i % 50 == 49:    # print every 50 mini-batches
-            tfwriter.add_scalar('Loss/eval', running_loss / 50, i)
-            print(f'[{epoch + 1}, {i + 1:5d}] val loss: {running_loss:.3f}')
+        if i % 50 == 49:  # print every 50 mini-batches
+            tfwriter.add_scalar("Loss/eval", running_loss / 50, i)
+            print(f"[{epoch + 1}, {i + 1:5d}] val loss: {running_loss:.3f}")
             running_loss = 0.0
-    print('all done!')
+    print("all done!")
 
     return val_loss_per_batch
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     # establish the model
     net = BirNet(target_conv=True).to(DEVICE)
     print(summary(net, (512, 16, 16)))
@@ -98,37 +110,51 @@ if __name__ == '__main__':
     optimizer = optim.Adam(net.parameters(), lr=0.001)
 
     # Change the run name below before each training!
-    run_name = 'conv3d_after_fully_connected'
-    writer = SummaryWriter('runs/' + run_name)
+    run_name = "conv3d_after_fully_connected"
+    writer = SummaryWriter("runs/" + run_name)
     # to view training results: tensorboard --logdir runs
     min_val_loss = 1000
     for epoch in range(100):  # loop over the dataset multiple times
         print(f"starting training epoch {epoch}")
-        trained_net, train_loss_per_batch = train_one_epoch(net, trainloader, criterion, optimizer, writer, epoch)
-        writer.add_scalar('Loss/train per epoch', train_loss_per_batch, epoch)
+        trained_net, train_loss_per_batch = train_one_epoch(
+            net, trainloader, criterion, optimizer, writer, epoch
+        )
+        writer.add_scalar("Loss/train per epoch", train_loss_per_batch, epoch)
 
         # validate after each epoch
-        val_loss_per_batch = validate(trained_net, valloader, criterion, optimizer, writer, epoch)
-        writer.add_scalar('Loss/validate per epoch', np.mean(val_loss_per_batch), epoch)
+        val_loss_per_batch = validate(
+            trained_net, valloader, criterion, optimizer, writer, epoch
+        )
+        writer.add_scalar("Loss/validate per epoch", np.mean(val_loss_per_batch), epoch)
 
-        print(f'mean val loss: {np.mean(val_loss_per_batch):.6f}, current min val loss: {min_val_loss:.6f}')
+        print(
+            f"mean val loss: {np.mean(val_loss_per_batch):.6f}, current min val loss: {min_val_loss:.6f}"
+        )
         if np.mean(val_loss_per_batch) < min_val_loss:
             # save model
-            save_dir = "../../../NN_data/small_sphere_random_bir1000/models/BirNet_Oct3/" + run_name + '/'
+            save_dir = (
+                "../../../NN_data/small_sphere_random_bir1000/models/BirNet_Oct3/"
+                + run_name
+                + "/"
+            )
             if not os.path.exists(save_dir):
                 os.makedirs(save_dir)
-            model_filename = save_dir + f'epoch{epoch}.pt'
+            model_filename = save_dir + f"epoch{epoch}.pt"
             torch.save(trained_net.state_dict(), model_filename)
-            print(f'saved model as {model_filename}')
+            print(f"saved model as {model_filename}")
             min_val_loss = np.mean(val_loss_per_batch)
 
     writer.close()
-    print('finished training')
+    print("finished training")
 
     # save model
-    save_dir = "../../../NN_data/small_sphere_random_bir1000/models/BirNet_Oct3/" + run_name + '/'
+    save_dir = (
+        "../../../NN_data/small_sphere_random_bir1000/models/BirNet_Oct3/"
+        + run_name
+        + "/"
+    )
     if not os.path.exists(save_dir):
         os.makedirs(save_dir)
-    model_filename = save_dir + 'final.pt'
+    model_filename = save_dir + "final.pt"
     torch.save(trained_net.state_dict(), model_filename)
-    print(f'saved model as {model_filename}')
+    print(f"saved model as {model_filename}")

@@ -1,16 +1,18 @@
-'''Resaves the TIF files of the light field images or birefringent objects.'''
+"""Resaves the TIF files of the light field images or birefringent objects."""
+
 import tifffile
 import os
 import numpy as np
 
+
 class ImageTransformer:
     def __init__(self, src_dir, dest_dir):
         self.src_dir = src_dir
-        self.src_im_dir = os.path.join(src_dir, 'images')
-        self.src_ob_dir = os.path.join(src_dir, 'objects')
+        self.src_im_dir = os.path.join(src_dir, "images")
+        self.src_ob_dir = os.path.join(src_dir, "objects")
         self.dest_dir = dest_dir
-        self.dest_im_dir = os.path.join(dest_dir, 'images')
-        self.dest_ob_dir = os.path.join(dest_dir, 'objects')
+        self.dest_im_dir = os.path.join(dest_dir, "images")
+        self.dest_ob_dir = os.path.join(dest_dir, "objects")
 
         # Ensure destination directory exists or create it
         if not os.path.exists(self.dest_im_dir):
@@ -47,7 +49,9 @@ class ImageTransformer:
             # Save the cropped TIFF file to the destination directory
             tifffile.imwrite(dest_path, cropped_image)
 
-        print(f"Successfully transformed and saved TIFF images from {self.src_ob_dir} to {self.dest_ob_dir}.")
+        print(
+            f"Successfully transformed and saved TIFF images from {self.src_ob_dir} to {self.dest_ob_dir}."
+        )
 
     def resave_image(self):
         """
@@ -66,7 +70,9 @@ class ImageTransformer:
             # Save the TIFF file to the destination directory
             tifffile.imwrite(dest_path, image)
 
-        print(f"Successfully transformed and saved TIFF images from {self.src_im_dir} to {self.dest_im_dir}.")
+        print(
+            f"Successfully transformed and saved TIFF images from {self.src_im_dir} to {self.dest_im_dir}."
+        )
 
     def verify_crop_volume_empty(self, crop_box):
         """
@@ -88,7 +94,7 @@ class ImageTransformer:
             # Crop images in the last two dimensions
             left, upper, right, lower = crop_box
             cropped_image = image[:, :, upper:lower, left:right]
-            
+
             # Check for nonzero birefringence values
             delta_n = cropped_image[0, ...]
             nonzero_bool = np.any(delta_n != 0)
@@ -99,8 +105,10 @@ class ImageTransformer:
                 print(f"Volume {file} has {count} nonzero birefringence values.")
                 # break
 
-        print(f"Successfully checked that the cropped region {crop_box} from the objects in" +
-              f"{self.src_ob_dir} have only zero birefringence values, except for {num_nonempty} objects.")
+        print(
+            f"Successfully checked that the cropped region {crop_box} from the objects in"
+            + f"{self.src_ob_dir} have only zero birefringence values, except for {num_nonempty} objects."
+        )
 
     def verify_volume_empty_after_zero_fill(self, crop_box):
         """
@@ -125,7 +133,7 @@ class ImageTransformer:
             left, upper, right, lower = crop_box
             delta_n_fill_zero[:, upper:lower, left:right] = 0
             cropped_image = image[:, :, upper:lower, left:right]
-            
+
             # Check for nonzero birefringence values
             nonzero_bool = np.any(delta_n_fill_zero != 0)
 
@@ -135,8 +143,10 @@ class ImageTransformer:
                 print(f"Volume {file} has {count} nonzero birefringence values.")
                 # break
 
-        print(f"Successfully checked that the cropped region {crop_box} from the objects in" +
-              f"{self.src_ob_dir} have only zero birefringence values, except for {num_nonempty} objects.")
+        print(
+            f"Successfully checked that the cropped region {crop_box} from the objects in"
+            + f"{self.src_ob_dir} have only zero birefringence values, except for {num_nonempty} objects."
+        )
 
     def verify_zdepth_empty(self):
         """
@@ -157,14 +167,16 @@ class ImageTransformer:
 
             delta_n_top = image[0, 0, :, :]
             delta_n_bottom = image[0, -1, :, :]
-            
+
             # Check for nonzero birefringence values
             nonzero_bool_top = np.any(delta_n_top != 0)
 
             if nonzero_bool_top == True:
                 count = np.count_nonzero(delta_n_top)
                 num_nonempty += 1
-                print(f"Volume {file} top layer has {count} nonzero birefringence values.")
+                print(
+                    f"Volume {file} top layer has {count} nonzero birefringence values."
+                )
                 # break
 
             # Check for nonzero birefringence values
@@ -173,15 +185,23 @@ class ImageTransformer:
             if nonzero_bool_bottom == True:
                 count = np.count_nonzero(delta_n_bottom)
                 num_nonempty += 1
-                print(f"Volume {file} bottom layer has {count} nonzero birefringence values.")
+                print(
+                    f"Volume {file} bottom layer has {count} nonzero birefringence values."
+                )
                 # break
 
-        print(f"Successfully checked that the objects in" +
-              f"{self.src_ob_dir} have only zero birefringence values, " +
-              f"except for {num_nonempty} top or bottom layers of objects.")
+        print(
+            f"Successfully checked that the objects in"
+            + f"{self.src_ob_dir} have only zero birefringence values, "
+            + f"except for {num_nonempty} top or bottom layers of objects."
+        )
 
-if __name__ == '__main__':
-    transformer = ImageTransformer("/mnt/efs/shared_data/restorators/spheres", "/mnt/efs/shared_data/restorators/spheres_11by11")
+
+if __name__ == "__main__":
+    transformer = ImageTransformer(
+        "/mnt/efs/shared_data/restorators/spheres",
+        "/mnt/efs/shared_data/restorators/spheres_11by11",
+    )
     object_region = (10, 10, 21, 21)
     transformer.verify_volume_empty_after_zero_fill(object_region)
     transformer.crop_object(object_region)
